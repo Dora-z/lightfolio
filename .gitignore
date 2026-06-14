@@ -1,0 +1,8 @@
+.server-*.log
+__pycache__/
+*.log
+upload-test.png
+uploads/*
+!uploads/.gitignore
+uploads/previews/*
+vendor/

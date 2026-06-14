@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Lightfolio 摄影画廊" />
+    <title>Lightfolio | 画廊</title>
+    <link rel="stylesheet" href="./styles.css?v=20260614-same-height" />
+  </head>
+  <body class="gallery-page">
+    <div id="gallery-app" v-cloak>
+      <header class="gallery-topbar">
+        <a class="brand" href="./index.html" aria-label="Lightfolio 画廊">
+          <span class="brand-mark"></span>
+          <span>Lightfolio</span>
+        </a>
+        <nav class="gallery-actions" aria-label="画廊操作">
+          <button class="icon-button" type="button" @click="compact = !compact" aria-label="切换密度" title="切换密度">
+            <span class="icon-grid"></span>
+          </button>
+          <a class="ghost-button" href="./admin.php">管理</a>
+        </nav>
+      </header>
+
+      <main class="gallery-view" :class="{ 'is-compact': compact }" aria-label="摄影作品画廊">
+        <aside class="category-strip" aria-label="分类">
+          <button class="category-pill" :class="{ 'is-active': activeCategory === 'all' }" type="button" @click="setCategory('all')">
+            全部
+          </button>
+          <button
+            v-for="category in categories"
+            :key="category.id"
+            class="category-pill"
+            :class="{ 'is-active': activeCategory === category.id }"
+            type="button"
+            @click="setCategory(category.id)"
+          >
+            {{ category.name }}
+          </button>
+        </aside>
+
+        <section id="gallery" class="gallery-board" :class="{ 'is-switching': switching }" aria-live="polite">
+          <div v-if="!visibleGroups.length" class="empty-state">
+            <span>暂无作品</span>
+          </div>
+
+          <section v-for="category in visibleCategories" :key="category.id" class="category-section">
+            <header class="section-heading">
+              <h1>{{ category.name }}</h1>
+              <span>{{ groupsForCategory(category.id).length }} 组</span>
+            </header>
+
+            <div class="collection-grid">
+              <button
+                v-for="group in groupsForCategory(category.id)"
+                :key="group.id"
+                class="collection-card"
+                type="button"
+                @click="openGroup(group.id)"
+              >
+                <span class="photo-stack" :class="stackClass(group.id)">
+                  <span
+                    v-for="(photo, index) in photosForGroup(group.id).slice(0, 3)"
+                    :key="photo.id"
+                    class="photo-tile"
+                    :class="`photo-tile-${index + 1}`"
+                  >
+                    <img
+                      :src="previewSrc(photo)"
+                      :alt="photo.title"
+                      loading="lazy"
+                      @load="rememberPhotoSize(photo.id, $event)"
+                    />
+                    <em v-if="index === 2 && photosForGroup(group.id).length > 3">+{{ photosForGroup(group.id).length - 3 }}</em>
+                  </span>
+                </span>
+                <span class="collection-meta">
+                  <strong>{{ group.name }}</strong>
+                  <small>{{ stackMeta(group) }}</small>
+                </span>
+              </button>
+            </div>
+          </section>
+        </section>
+      </main>
+
+      <section class="viewer" :class="{ 'is-changing': viewerChanging }" role="dialog" aria-modal="true" aria-labelledby="viewer-title" v-show="viewerOpen">
+        <button class="viewer-close" type="button" aria-label="关闭" @click="closeViewer">×</button>
+        <button class="viewer-arrow viewer-prev" type="button" aria-label="上一张" @click="moveViewer(-1)">‹</button>
+        <figure class="viewer-frame">
+          <div class="viewer-zoom-stage" @wheel.prevent="zoomViewer" @dblclick="resetViewerZoom">
+            <img
+              :src="currentPhoto?.url || ''"
+              :alt="currentPhoto?.title || ''"
+              :class="{ 'is-zoomed': viewerZoom.scale > 1, 'is-panning': viewerDrag.active }"
+              :style="viewerImageStyle"
+              @load="onViewerImageLoad"
+              @pointerdown="startViewerPan"
+              @pointermove="moveViewerPan"
+              @pointerup="endViewerPan"
+              @pointercancel="endViewerPan"
+              @lostpointercapture="endViewerPan"
+            />
+          </div>
+          <figcaption>
+            <strong id="viewer-title">{{ currentPhoto?.title }}</strong>
+            <span>{{ viewerMeta }}</span>
+          </figcaption>
+        </figure>
+        <button class="viewer-arrow viewer-next" type="button" aria-label="下一张" @click="moveViewer(1)">›</button>
+        <div class="viewer-thumbs" v-if="viewerPhotos.length > 1">
+          <button
+            v-for="(photo, index) in viewerPhotos"
+            :key="photo.id"
+            type="button"
+            :class="{ 'is-active': index === currentIndex }"
+            @click="setViewerIndex(index)"
+            :aria-label="`查看第 ${index + 1} 张`"
+          >
+            <img :src="previewSrc(photo)" :alt="photo.title" loading="lazy" />
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <script src="./vendor/vue.global.prod.js"></script>
+    <script src="./gallery-data.js?v=20260614-preview-fix"></script>
+    <script src="./script.js?v=20260614-preview-fix"></script>
+  </body>
+</html>
