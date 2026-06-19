@@ -1,10 +1,29 @@
 <?php
 declare(strict_types=1);
 
-const LIGHTFOLIO_ADMIN_USER = 'admin';
-// Default password: admin123. Change the salt/hash pair before publishing.
-const LIGHTFOLIO_ADMIN_PASSWORD_SALT = 'lightfolio-admin-v1';
-const LIGHTFOLIO_ADMIN_PASSWORD_PBKDF2 = 'd5f356d6ae6ae1f4c301e9d055bf44c8c5d809946987debd3c3f1f7864df0831';
+$lightfolioAuthConfig = [
+    'admin_user' => 'admin',
+    // Default password: admin123. Run install.php before publishing.
+    'admin_password_salt' => 'lightfolio-admin-v1',
+    'admin_password_pbkdf2' => 'd5f356d6ae6ae1f4c301e9d055bf44c8c5d809946987debd3c3f1f7864df0831',
+];
+
+$lightfolioConfigFile = __DIR__ . '/config.php';
+if (is_file($lightfolioConfigFile)) {
+    $customConfig = require $lightfolioConfigFile;
+    if (is_array($customConfig)) {
+        foreach ($lightfolioAuthConfig as $key => $fallback) {
+            $value = $customConfig[$key] ?? $fallback;
+            if (is_string($value) && $value !== '') {
+                $lightfolioAuthConfig[$key] = $value;
+            }
+        }
+    }
+}
+
+define('LIGHTFOLIO_ADMIN_USER', $lightfolioAuthConfig['admin_user']);
+define('LIGHTFOLIO_ADMIN_PASSWORD_SALT', $lightfolioAuthConfig['admin_password_salt']);
+define('LIGHTFOLIO_ADMIN_PASSWORD_PBKDF2', $lightfolioAuthConfig['admin_password_pbkdf2']);
 
 session_name('lightfolio_admin_session');
 session_start([

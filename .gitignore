@@ -2,6 +2,7 @@
 __pycache__/
 *.log
 upload-test.png
+lib/config.php
 data/*.sqlite
 data/*.sqlite-*
 data/*.restore-backup-*

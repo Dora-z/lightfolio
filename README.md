@@ -20,6 +20,7 @@
 ```text
 lightfolio/
 ├─ index.html            # 前台画廊入口
+├─ install.php           # 首次部署安装程序
 ├─ admin.php             # 后台管理入口
 ├─ login.php             # 后台登录页
 ├─ logout.php            # 后台退出
@@ -54,6 +55,17 @@ D:\EServer-data\childApp\php\php-8.5\php.exe -S 127.0.0.1:5273 -t C:\Users\DoraZ
 http://127.0.0.1:5273/
 ```
 
+## 服务器安装
+
+1. 上传项目文件到站点目录，并确保 Web 服务器指向项目根目录。
+2. 访问 `https://你的域名/install.php`。
+3. 按页面检查结果开启 `pdo_sqlite`，并确认 `lib/`、`uploads/` 和项目同级目录可写。
+4. 在安装页面设置后台管理员账号和密码。
+5. 安装完成后访问 `login.php` 登录后台。
+6. 正式上线后建议删除 `install.php`，或在 Nginx / Apache 中限制它的访问。
+
+安装程序会生成 `lib/config.php` 保存管理员账号配置，并初始化 `lightfolio-storage/lightfolio.sqlite`。
+
 ## 后台登录
 
 默认后台账号：
@@ -61,7 +73,7 @@ http://127.0.0.1:5273/
 - 用户名：`admin`
 - 密码：`admin123`
 
-登录校验位于 [lib/auth.php](/C:/Users/DoraZhang/Documents/lightfolio/lib/auth.php)，正式上线前建议修改默认账号密码。
+如果已运行安装程序，请使用安装时设置的账号密码。未安装时会回退到上面的默认账号，正式上线前务必运行安装程序或手动修改配置。
 
 ## 上传与图片策略
 
