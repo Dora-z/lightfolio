@@ -740,6 +740,14 @@ createApp({
     trimNumber(value) {
       return Number(value).toFixed(Number.isInteger(value) ? 0 : 1).replace(/\.0$/, "");
     },
+    async readJsonResponse(response) {
+      const text = await response.text();
+      try {
+        return text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`Server returned non-JSON response (${response.status})`);
+      }
+    },
     async uploadPhoto(event) {
       const file = event.target.files?.[0];
       if (!file) return;
@@ -764,7 +772,7 @@ createApp({
           headers: { "X-CSRF-Token": window.LightfolioStore.csrfToken() },
           body: formData,
         });
-        const payload = await response.json();
+        const payload = await this.readJsonResponse(response);
         if (!response.ok) throw new Error(payload.error || "Upload failed");
 
         this.photoForm.url = payload.url;
@@ -794,7 +802,7 @@ createApp({
           headers: { "X-CSRF-Token": window.LightfolioStore.csrfToken() },
           body: formData,
         });
-        const payload = await response.json();
+        const payload = await this.readJsonResponse(response);
         if (!response.ok || !payload.ok) throw new Error(payload.error || "Restore failed");
 
         window.LightfolioStore.reset();

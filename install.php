@@ -2,9 +2,17 @@
 declare(strict_types=1);
 
 require __DIR__ . '/lib/sqlite_store.php';
+require __DIR__ . '/lib/auth.php';
 
-$configFile = __DIR__ . '/lib/config.php';
+$configFile = lightfolio_auth_config_file();
 $installed = is_file($configFile);
+
+if ($installed) {
+    http_response_code(404);
+    echo 'Not found';
+    exit;
+}
+
 $errors = [];
 $messages = [];
 
@@ -109,8 +117,8 @@ function lightfolio_install_checks(string $configFile): array
         ],
         [
             'label' => '存储目录',
-            'detail' => lightfolio_path_status(LIGHTFOLIO_STORAGE_DIR),
-            'ok' => lightfolio_parent_or_self_writable(LIGHTFOLIO_STORAGE_DIR),
+            'detail' => lightfolio_path_status(lightfolio_storage_dir()),
+            'ok' => lightfolio_parent_or_self_writable(lightfolio_storage_dir()),
             'required' => true,
         ],
         [

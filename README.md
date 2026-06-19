@@ -13,7 +13,7 @@
 - 预览图机制：
   画廊列表与后台缩略图优先加载预览图，进入全屏灯箱时再加载原图，提升页面加载速度。
 - SQLite 存储：
-  分类、分组、作品数据默认保存在项目同级的 `lightfolio-storage/lightfolio.sqlite`，避免被 Web 服务器直接下载；首次运行会尝试从旧 JSON 文件迁移。
+  分类、分组、作品数据优先保存在项目同级的 `lightfolio-storage/lightfolio.sqlite`；如果服务器启用了 `open_basedir` 且不允许访问站点外目录，会自动回退到 `data/lightfolio.sqlite`。首次运行会尝试从旧 JSON 文件迁移。
 
 ## 目录结构
 
@@ -62,9 +62,42 @@ http://127.0.0.1:5273/
 3. 按页面检查结果开启 `pdo_sqlite`，并确认 `lib/`、`uploads/` 和项目同级目录可写。
 4. 在安装页面设置后台管理员账号和密码。
 5. 安装完成后访问 `login.php` 登录后台。
-6. 正式上线后建议删除 `install.php`，或在 Nginx / Apache 中限制它的访问。
+6. 安装完成后 `install.php` 会自动返回 404；正式上线后仍建议删除 `install.php`，或在 Nginx / Apache 中限制它的访问。
 
-安装程序会生成 `lib/config.php` 保存管理员账号配置，并初始化 `lightfolio-storage/lightfolio.sqlite`。
+安装程序会生成 `lib/config.php` 保存管理员账号配置，并初始化 SQLite 数据库。若服务器允许访问站点外目录，数据库会放在 `lightfolio-storage/lightfolio.sqlite`；否则会放在 `data/lightfolio.sqlite`。
+
+## Docker / NAS 部署
+
+项目内置 Dockerfile 和 `docker-compose.yml`，适合在 NAS 上运行。
+
+```bash
+docker compose up -d --build
+```
+
+默认访问地址：
+
+```text
+http://NAS-IP:8080/
+```
+
+首次启动后访问：
+
+```text
+http://NAS-IP:8080/install.php
+```
+
+默认持久化目录：
+
+- `./docker-data/storage`：保存 `config.php` 和 `lightfolio.sqlite`
+- `./docker-data/uploads`：保存上传图片与预览图
+- `./docker-data/data`：保存可选的 JSON 迁移源
+
+如果要迁移当前本地数据到 NAS：
+
+1. 把当前 `uploads/` 里的图片复制到 NAS 的 `docker-data/uploads/`
+2. 把当前 `lightfolio.sqlite` 复制到 NAS 的 `docker-data/storage/lightfolio.sqlite`
+3. 如果只有 JSON 数据，也可以把 `data/*.json` 复制到 NAS 的 `docker-data/data/`
+4. 再执行 `docker compose up -d --build`
 
 ## 后台登录
 

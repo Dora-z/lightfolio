@@ -1,0 +1,15 @@
+services:
+  lightfolio:
+    build: .
+    image: lightfolio:latest
+    container_name: lightfolio
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      LIGHTFOLIO_STORAGE_DIR: /var/www/storage
+      LIGHTFOLIO_CONFIG_FILE: /var/www/storage/config.php
+    volumes:
+      - ./docker-data/storage:/var/www/storage
+      - ./docker-data/uploads:/var/www/html/uploads
+      - ./docker-data/data:/var/www/html/data

@@ -2,9 +2,8 @@
 declare(strict_types=1);
 
 const LIGHTFOLIO_DATA_DIR = __DIR__ . '/../data';
-const LIGHTFOLIO_STORAGE_DIR = __DIR__ . '/../../lightfolio-storage';
+const LIGHTFOLIO_EXTERNAL_STORAGE_DIR = __DIR__ . '/../../lightfolio-storage';
 const LIGHTFOLIO_PUBLIC_DB_FILE = LIGHTFOLIO_DATA_DIR . '/lightfolio.sqlite';
-const LIGHTFOLIO_DB_FILE = LIGHTFOLIO_STORAGE_DIR . '/lightfolio.sqlite';
 const LIGHTFOLIO_CATEGORIES_JSON = LIGHTFOLIO_DATA_DIR . '/categories.json';
 const LIGHTFOLIO_GROUPS_JSON = LIGHTFOLIO_DATA_DIR . '/groups.json';
 const LIGHTFOLIO_PHOTOS_JSON = LIGHTFOLIO_DATA_DIR . '/photos.json';
@@ -23,7 +22,7 @@ function lightfolio_db(): PDO
 
     lightfolio_prepare_storage();
 
-    $pdo = new PDO('sqlite:' . LIGHTFOLIO_DB_FILE);
+    $pdo = new PDO('sqlite:' . lightfolio_db_file());
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     $pdo->exec('PRAGMA foreign_keys = ON');
@@ -37,13 +36,16 @@ function lightfolio_db(): PDO
 
 function lightfolio_prepare_storage(): void
 {
-    if (!is_dir(LIGHTFOLIO_STORAGE_DIR)) {
-        mkdir(LIGHTFOLIO_STORAGE_DIR, 0755, true);
+    $storageDir = lightfolio_storage_dir();
+    $dbFile = lightfolio_db_file();
+
+    if (!is_dir($storageDir) && !mkdir($storageDir, 0755, true)) {
+        throw new RuntimeException('Could not create storage directory.');
     }
 
-    if (!file_exists(LIGHTFOLIO_DB_FILE) && file_exists(LIGHTFOLIO_PUBLIC_DB_FILE)) {
-        if (!@rename(LIGHTFOLIO_PUBLIC_DB_FILE, LIGHTFOLIO_DB_FILE)) {
-            if (!copy(LIGHTFOLIO_PUBLIC_DB_FILE, LIGHTFOLIO_DB_FILE)) {
+    if ($dbFile !== LIGHTFOLIO_PUBLIC_DB_FILE && !file_exists($dbFile) && file_exists(LIGHTFOLIO_PUBLIC_DB_FILE)) {
+        if (!@rename(LIGHTFOLIO_PUBLIC_DB_FILE, $dbFile)) {
+            if (!copy(LIGHTFOLIO_PUBLIC_DB_FILE, $dbFile)) {
                 throw new RuntimeException('Could not move SQLite database outside the public document root.');
             }
 
@@ -51,9 +53,68 @@ function lightfolio_prepare_storage(): void
         }
     }
 
-    if (file_exists(LIGHTFOLIO_DB_FILE) && file_exists(LIGHTFOLIO_PUBLIC_DB_FILE)) {
+    if ($dbFile !== LIGHTFOLIO_PUBLIC_DB_FILE && file_exists($dbFile) && file_exists(LIGHTFOLIO_PUBLIC_DB_FILE)) {
         @unlink(LIGHTFOLIO_PUBLIC_DB_FILE);
     }
+}
+
+function lightfolio_storage_dir(): string
+{
+    $configuredDir = getenv('LIGHTFOLIO_STORAGE_DIR');
+    if (is_string($configuredDir) && trim($configuredDir) !== '') {
+        return rtrim($configuredDir, "\\/");
+    }
+
+    return lightfolio_path_allowed(LIGHTFOLIO_EXTERNAL_STORAGE_DIR)
+        ? LIGHTFOLIO_EXTERNAL_STORAGE_DIR
+        : LIGHTFOLIO_DATA_DIR;
+}
+
+function lightfolio_db_file(): string
+{
+    return lightfolio_storage_dir() . '/lightfolio.sqlite';
+}
+
+function lightfolio_path_allowed(string $path): bool
+{
+    $openBasedir = trim((string)ini_get('open_basedir'));
+    if ($openBasedir === '') {
+        return true;
+    }
+
+    $normalizedPath = lightfolio_normalize_path($path);
+    foreach (explode(PATH_SEPARATOR, $openBasedir) as $allowedPath) {
+        $allowedPath = trim($allowedPath);
+        if ($allowedPath === '') {
+            continue;
+        }
+
+        $normalizedAllowed = lightfolio_normalize_path($allowedPath);
+        if ($normalizedPath === $normalizedAllowed || str_starts_with($normalizedPath, rtrim($normalizedAllowed, '/') . '/')) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function lightfolio_normalize_path(string $path): string
+{
+    $segments = [];
+    $path = str_replace('\\', '/', $path);
+    $prefix = str_starts_with($path, '/') ? '/' : '';
+    foreach (explode('/', $path) as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+        if ($segment === '..') {
+            array_pop($segments);
+            continue;
+        }
+        $segments[] = $segment;
+    }
+
+    return $prefix . implode('/', $segments);
 }
 
 function lightfolio_initialize_schema(PDO $pdo): void

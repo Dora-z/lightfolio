@@ -8,7 +8,7 @@ $lightfolioAuthConfig = [
     'admin_password_pbkdf2' => 'd5f356d6ae6ae1f4c301e9d055bf44c8c5d809946987debd3c3f1f7864df0831',
 ];
 
-$lightfolioConfigFile = __DIR__ . '/config.php';
+$lightfolioConfigFile = lightfolio_auth_config_file();
 if (is_file($lightfolioConfigFile)) {
     $customConfig = require $lightfolioConfigFile;
     if (is_array($customConfig)) {
@@ -24,6 +24,16 @@ if (is_file($lightfolioConfigFile)) {
 define('LIGHTFOLIO_ADMIN_USER', $lightfolioAuthConfig['admin_user']);
 define('LIGHTFOLIO_ADMIN_PASSWORD_SALT', $lightfolioAuthConfig['admin_password_salt']);
 define('LIGHTFOLIO_ADMIN_PASSWORD_PBKDF2', $lightfolioAuthConfig['admin_password_pbkdf2']);
+
+function lightfolio_auth_config_file(): string
+{
+    $configFile = getenv('LIGHTFOLIO_CONFIG_FILE');
+    if (is_string($configFile) && trim($configFile) !== '') {
+        return $configFile;
+    }
+
+    return __DIR__ . '/config.php';
+}
 
 session_name('lightfolio_admin_session');
 session_start([

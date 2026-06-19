@@ -87,15 +87,16 @@ function send_json_backup(): void
 function send_sqlite_backup(): void
 {
     lightfolio_db();
+    $dbFile = lightfolio_db_file();
 
-    if (!file_exists(LIGHTFOLIO_DB_FILE)) {
+    if (!file_exists($dbFile)) {
         throw new RuntimeException('Database file is missing.');
     }
 
     header('Content-Type: application/vnd.sqlite3');
-    header('Content-Length: ' . filesize(LIGHTFOLIO_DB_FILE));
+    header('Content-Length: ' . filesize($dbFile));
     header('Content-Disposition: attachment; filename="lightfolio-' . date('Ymd-His') . '.sqlite"');
-    readfile(LIGHTFOLIO_DB_FILE);
+    readfile($dbFile);
     exit;
 }
 
@@ -126,12 +127,13 @@ function restore_sqlite_backup(string $path): void
         }
     }
 
-    $backupPath = LIGHTFOLIO_DB_FILE . '.restore-backup-' . date('YmdHis');
-    if (file_exists(LIGHTFOLIO_DB_FILE) && !copy(LIGHTFOLIO_DB_FILE, $backupPath)) {
+    $dbFile = lightfolio_db_file();
+    $backupPath = $dbFile . '.restore-backup-' . date('YmdHis');
+    if (file_exists($dbFile) && !copy($dbFile, $backupPath)) {
         throw new RuntimeException('Could not create restore backup.');
     }
 
-    if (!copy($path, LIGHTFOLIO_DB_FILE)) {
+    if (!copy($path, $dbFile)) {
         throw new RuntimeException('Could not restore SQLite backup.');
     }
 }

@@ -1,0 +1,14 @@
+.git
+.gitignore
+.dockerignore
+*.log
+.php-*-err.log
+.php-*-out.log
+docker-data
+lightfolio-release-*
+lib/config.php
+data/*.sqlite
+data/*.sqlite-*
+data/*.restore-backup-*
+uploads/*
+!uploads/.gitignore
