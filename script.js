@@ -51,18 +51,50 @@ createApp({
       }
       return this.categories.filter((category) => ids.has(category.id));
     },
+    totalPhotoCount() {
+      const visibleGroupIds = new Set(this.groups.filter((group) => this.photosForGroup(group.id).length > 0).map((group) => group.id));
+      return this.photos.filter((photo) => visibleGroupIds.has(photo.group)).length;
+    },
+    galleryStats() {
+      const visibleGroupIds = new Set(this.visibleGroups.map((group) => group.id));
+      return {
+        groups: this.visibleGroups.length,
+        photos: this.photos.filter((photo) => visibleGroupIds.has(photo.group)).length,
+      };
+    },
+    activeGalleryTitle() {
+      return this.activeCategory === "all" ? "全部作品" : this.categoryLabel(this.activeCategory);
+    },
+    activeGalleryKicker() {
+      return this.activeCategory === "all" ? "Lightfolio" : "当前分类";
+    },
     currentPhoto() {
       return this.viewerPhotos[this.currentIndex] || null;
     },
-    viewerMeta() {
+    viewerPhotoDetails() {
       if (!this.currentPhoto) return "";
+
+      const info = window.LightfolioStore.getPhotoInfo(this.currentPhoto);
+      return [info.shotAt, info.gear, info.focalLength, info.aperture, info.shutter, info.iso].filter(Boolean).join(" · ");
+    },
+    viewerGroupPosition() {
+      if (!this.currentPhoto) return "";
+      return [this.groupLabel(this.currentPhoto.group), `${this.currentIndex + 1} / ${this.viewerPhotos.length}`].filter(Boolean).join(" · ");
+    },
+    viewerExtraMeta() {
+      if (!this.currentPhoto) return "";
+      const info = window.LightfolioStore.getPhotoInfo(this.currentPhoto);
+      return info.meta;
+    },
+    viewerMetaLines() {
+      if (!this.currentPhoto) return [];
+
+      const info = window.LightfolioStore.getPhotoInfo(this.currentPhoto);
       return [
-        this.groupLabel(this.currentPhoto.group),
-        this.currentPhoto.meta,
-        `${this.currentIndex + 1} / ${this.viewerPhotos.length}`,
-      ]
-        .filter(Boolean)
-        .join(" · ");
+        [this.groupLabel(this.currentPhoto.group), `${this.currentIndex + 1} / ${this.viewerPhotos.length}`].filter(Boolean).join(" · "),
+        [info.shotAt, info.gear, info.focalLength, info.aperture, info.shutter, info.iso].filter(Boolean).join(" · "),
+        info.meta,
+      ].filter(Boolean);
     },
     viewerImageStyle() {
       return {
@@ -89,13 +121,22 @@ createApp({
   },
   methods: {
     categoryLabel(categoryId) {
-      return this.categoryMap[categoryId]?.name || categoryId;
+      return this.categoryMap[categoryId]?.name || categoryId || "";
     },
     groupLabel(groupId) {
-      return this.groupMap[groupId]?.name || groupId;
+      return this.groupMap[groupId]?.name || groupId || "";
     },
     photosForGroup(groupId) {
       return this.photos.filter((photo) => photo.group === groupId);
+    },
+    coverPhotosForGroup(group) {
+      const photos = this.photosForGroup(group.id);
+      if (!group.coverPhotoId) return photos;
+
+      const cover = photos.find((photo) => photo.id === group.coverPhotoId);
+      if (!cover) return photos;
+
+      return [cover, ...photos.filter((photo) => photo.id !== cover.id)];
     },
     previewSrc(photo) {
       return photo?.previewUrl || photo?.thumbnail || photo?.url || "";
@@ -103,11 +144,14 @@ createApp({
     groupsForCategory(categoryId) {
       return this.visibleGroups.filter((group) => group.category === categoryId);
     },
+    categoryPhotoCount(categoryId) {
+      const groupIds = new Set(this.groups.filter((group) => group.category === categoryId).map((group) => group.id));
+      return this.photos.filter((photo) => groupIds.has(photo.group)).length;
+    },
     stackClass(groupId) {
-      const photos = this.photosForGroup(groupId).slice(0, 4);
+      const photos = this.coverPhotosForGroup(this.groupMap[groupId] || { id: groupId }).slice(0, 4);
       const countClass = `has-${Math.min(photos.length, 4)}`;
       const orientation = this.groupOrientation(photos);
-
       return [countClass, `is-${orientation}`];
     },
     groupOrientation(photos) {
@@ -146,7 +190,7 @@ createApp({
       }, 150);
     },
     openGroup(groupId) {
-      this.viewerPhotos = this.photosForGroup(groupId);
+      this.viewerPhotos = this.coverPhotosForGroup(this.groupMap[groupId] || { id: groupId });
       this.currentIndex = 0;
       this.viewerOpen = true;
       this.viewerChanging = true;

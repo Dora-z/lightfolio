@@ -2,14 +2,16 @@
 declare(strict_types=1);
 
 require __DIR__ . '/../lib/auth.php';
-
-const DATA_FILE = __DIR__ . '/../data/photos.json';
-const GROUPS_FILE = __DIR__ . '/../data/groups.json';
+require __DIR__ . '/../lib/sqlite_store.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    echo json_encode(read_photos(), JSON_UNESCAPED_UNICODE);
+    try {
+        echo json_encode(read_photos(), JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $error) {
+        lightfolio_json_error($error);
+    }
     exit;
 }
 
@@ -41,30 +43,18 @@ if (!is_array($payload)) {
 }
 
 $photos = normalize_photos($payload);
-$directory = dirname(DATA_FILE);
 
-if (!is_dir($directory)) {
-    mkdir($directory, 0755, true);
+try {
+    lightfolio_save_photos($photos);
+} catch (Throwable $error) {
+    lightfolio_json_error($error);
 }
-
-file_put_contents(
-    DATA_FILE,
-    json_encode($photos, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
-    LOCK_EX
-);
 
 echo json_encode($photos, JSON_UNESCAPED_UNICODE);
 
 function read_photos(): array
 {
-    if (!file_exists(DATA_FILE)) {
-        return [];
-    }
-
-    $content = file_get_contents(DATA_FILE);
-    $photos = json_decode($content ?: '[]', true);
-
-    return normalize_photos(is_array($photos) ? $photos : []);
+    return normalize_photos(lightfolio_read_photos());
 }
 
 function normalize_photos(array $value): array
@@ -99,7 +89,14 @@ function normalize_photos(array $value): array
             'id' => trim((string)($item['id'] ?? '')) ?: 'p-' . str_pad((string)(count($photos) + 1), 3, '0', STR_PAD_LEFT),
             'title' => $title,
             'group' => $group,
-            'meta' => trim((string)($item['meta'] ?? '')),
+            'meta' => limit_text($item['meta'] ?? '', 120),
+            'shotAt' => normalize_shot_at($item['shotAt'] ?? ''),
+            'camera' => limit_text($item['camera'] ?? '', 80),
+            'lens' => limit_text($item['lens'] ?? '', 80),
+            'focalLength' => limit_text($item['focalLength'] ?? '', 24),
+            'aperture' => limit_text($item['aperture'] ?? '', 24),
+            'shutter' => limit_text($item['shutter'] ?? '', 24),
+            'iso' => limit_text($item['iso'] ?? '', 24),
             'url' => $url,
             'previewUrl' => $previewUrl,
         ];
@@ -130,19 +127,8 @@ function inferred_preview_url(string $url): string
 
 function group_ids(): array
 {
-    if (!file_exists(GROUPS_FILE)) {
-        return ['daily', 'travel'];
-    }
-
-    $content = file_get_contents(GROUPS_FILE);
-    $groups = json_decode($content ?: '[]', true);
-
-    if (!is_array($groups)) {
-        return ['daily', 'travel'];
-    }
-
     $ids = [];
-    foreach ($groups as $group) {
+    foreach (lightfolio_read_groups() as $group) {
         if (is_array($group) && isset($group['id'])) {
             $id = trim((string)$group['id']);
             if ($id !== '') {
@@ -152,4 +138,38 @@ function group_ids(): array
     }
 
     return count($ids) > 0 ? $ids : ['daily', 'travel'];
+}
+
+function limit_text(mixed $value, int $limit): string
+{
+    return mb_substr(trim((string)$value), 0, $limit, 'UTF-8');
+}
+
+function normalize_shot_at(mixed $value): string
+{
+    $text = trim((string)$value);
+    if ($text === '') {
+        return '';
+    }
+
+    $text = str_replace('T', ' ', $text);
+    if (preg_match('/^\d{4}[:\/-]\d{2}[:\/-]\d{2}(?:\s+\d{2}:\d{2}(?::\d{2})?)?$/', $text) !== 1) {
+        return $text;
+    }
+
+    $normalized = preg_replace('/[\/:](?=\d{2}(?:\s|$))/', '-', $text, 2);
+
+    if ($normalized === null) {
+        return $text;
+    }
+
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $normalized) === 1) {
+        return $normalized;
+    }
+
+    if (preg_match('/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}$/', $normalized) === 1) {
+        return $normalized . ':00';
+    }
+
+    return $normalized;
 }

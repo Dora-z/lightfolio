@@ -12,8 +12,8 @@
   ];
 
   const defaultGroups = [
-    { id: "daily", name: "日常记录", category: "life", description: "随手捕捉的光线、街角与瞬间。" },
-    { id: "travel", name: "旅行片段", category: "portfolio", description: "按旅程整理的一组照片。" },
+    { id: "daily", name: "日常记录", category: "life", description: "随手捕捉的光线、街角与瞬间。", coverPhotoId: "" },
+    { id: "travel", name: "旅行片段", category: "portfolio", description: "按旅程整理的一组照片。", coverPhotoId: "" },
   ];
 
   const defaultPhotos = [];
@@ -74,7 +74,8 @@
         const id = normalizeId(group?.id || name);
         const category = categories[group?.category] ? group.category : fallbackCategory;
         const description = String(group?.description || "").trim();
-        return { id, name, category, description };
+        const coverPhotoId = String(group?.coverPhotoId || "").trim();
+        return { id, name, category, description, coverPhotoId };
       })
       .filter((group) => {
         if (!group.id || !group.name || seen.has(group.id)) return false;
@@ -115,11 +116,73 @@
           id: photo.id || crypto.randomUUID(),
           title: String(photo.title).trim(),
           group: groups[legacyGroup] ? legacyGroup : fallbackGroup,
-          meta: String(photo.meta || "").trim(),
+          ...normalizePhotoDetails(photo),
           url,
           previewUrl: normalizePreviewUrl(url, photo.previewUrl || photo.thumbnail),
         };
       });
+  }
+
+  function normalizePhotoDetails(photo) {
+    return {
+      meta: normalizeText(photo?.meta, 120),
+      shotAt: normalizeShotAt(photo?.shotAt),
+      camera: normalizeText(photo?.camera, 80),
+      lens: normalizeText(photo?.lens, 80),
+      focalLength: normalizeText(photo?.focalLength, 24),
+      aperture: normalizeText(photo?.aperture, 24),
+      shutter: normalizeText(photo?.shutter, 24),
+      iso: normalizeText(photo?.iso, 24),
+    };
+  }
+
+  function normalizeText(value, maxLength = 120) {
+    return String(value || "")
+      .trim()
+      .slice(0, maxLength);
+  }
+
+  function normalizeShotAt(value) {
+    if (value instanceof Date && Number.isFinite(value.getTime())) {
+      return formatDateTime(value);
+    }
+
+    const text = String(value || "").trim();
+    if (!text) return "";
+
+    const normalized = text.replace("T", " ");
+    const match = normalized.match(/^(\d{4})[:/-](\d{2})[:/-](\d{2})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (!match) return normalized;
+
+    const [, year, month, day, hour = "", minute = "", second = ""] = match;
+    if (!hour) return `${year}-${month}-${day}`;
+
+    return `${year}-${month}-${day} ${hour}:${minute}:${second || "00"}`;
+  }
+
+  function formatDateTime(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hour = String(date.getHours()).padStart(2, "0");
+    const minute = String(date.getMinutes()).padStart(2, "0");
+    const second = String(date.getSeconds()).padStart(2, "0");
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+  }
+
+  function getPhotoInfo(photo) {
+    const details = normalizePhotoDetails(photo || {});
+    const gear = [details.camera, details.lens].filter(Boolean).join(" / ");
+    const exposure = [details.focalLength, details.aperture, details.shutter, details.iso].filter(Boolean).join(" · ");
+    const secondary = [details.shotAt, gear, exposure, details.meta].filter(Boolean);
+
+    return {
+      ...details,
+      gear,
+      exposure,
+      summary: secondary.join(" · "),
+      hasAny: secondary.length > 0,
+    };
   }
 
   function normalizePreviewUrl(url, previewUrl) {
@@ -242,8 +305,10 @@
     normalizeCategories,
     normalizeGroups,
     normalizePhotos,
+    normalizePhotoDetails,
     getCategoryMap,
     getGroupMap,
+    getPhotoInfo,
     normalizeImageUrl,
     getCategories,
     loadCategories,

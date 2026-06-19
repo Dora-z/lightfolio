@@ -12,8 +12,8 @@
   上传图片时先在浏览器端转换为 `WebP`，减少服务器处理压力。
 - 预览图机制：
   画廊列表与后台缩略图优先加载预览图，进入全屏灯箱时再加载原图，提升页面加载速度。
-- 本地 JSON 存储：
-  分类、分组、作品数据默认保存在 `data/` 目录，结构简单，便于部署和迁移。
+- SQLite 存储：
+  分类、分组、作品数据默认保存在项目同级的 `lightfolio-storage/lightfolio.sqlite`，避免被 Web 服务器直接下载；首次运行会尝试从旧 JSON 文件迁移。
 
 ## 目录结构
 
@@ -29,7 +29,8 @@ lightfolio/
 ├─ gallery-data.js       # 前后台共享数据层
 ├─ api/                  # 分类、分组、作品、上传接口
 ├─ lib/                  # 登录鉴权与安全相关逻辑
-├─ data/                 # 分类、分组、作品数据
+├─ data/                 # 旧 JSON 迁移源，禁止作为公开下载目录
+├─ router.php            # PHP 内置服务器敏感路径拦截
 └─ uploads/              # 上传目录（默认不纳入仓库）
 ```
 
@@ -44,7 +45,7 @@ lightfolio/
 在项目根目录执行：
 
 ```powershell
-D:\EServer-data\childApp\php\php-8.5\php.exe -S 127.0.0.1:5273 -t C:\Users\DoraZhang\Documents\lightfolio
+D:\EServer-data\childApp\php\php-8.5\php.exe -S 127.0.0.1:5273 -t C:\Users\DoraZhang\Documents\lightfolio C:\Users\DoraZhang\Documents\lightfolio\router.php
 ```
 
 然后访问：
@@ -81,4 +82,4 @@ http://127.0.0.1:5273/
 - 增加作品排序
 - 增加批量上传
 - 增加作品描述、拍摄参数与时间信息
-- 接入数据库替代 JSON 存储
+- 增加数据库备份与导出

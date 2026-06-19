@@ -19,8 +19,14 @@
     },
     {
         "id": "2026-gkj",
-        "name": "2026高考假",
+        "name": "2026武功山",
         "category": "sight",
         "description": "2026高考假旅游"
+    },
+    {
+        "id": "2026gkjcs",
+        "name": "2026长沙",
+        "category": "sight",
+        "description": "2026高考假长沙"
     }
 ]

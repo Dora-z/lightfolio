@@ -2,14 +2,16 @@
 declare(strict_types=1);
 
 require __DIR__ . '/../lib/auth.php';
-
-const GROUPS_FILE = __DIR__ . '/../data/groups.json';
-const CATEGORIES_FILE = __DIR__ . '/../data/categories.json';
+require __DIR__ . '/../lib/sqlite_store.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    echo json_encode(read_groups(), JSON_UNESCAPED_UNICODE);
+    try {
+        echo json_encode(read_groups(), JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $error) {
+        lightfolio_json_error($error);
+    }
     exit;
 }
 
@@ -48,29 +50,17 @@ if (count($groups) === 0) {
     exit;
 }
 
-$directory = dirname(GROUPS_FILE);
-
-if (!is_dir($directory)) {
-    mkdir($directory, 0755, true);
+try {
+    lightfolio_save_groups($groups);
+} catch (Throwable $error) {
+    lightfolio_json_error($error);
 }
-
-file_put_contents(
-    GROUPS_FILE,
-    json_encode($groups, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
-    LOCK_EX
-);
 
 echo json_encode($groups, JSON_UNESCAPED_UNICODE);
 
 function read_groups(): array
 {
-    if (!file_exists(GROUPS_FILE)) {
-        return default_groups();
-    }
-
-    $content = file_get_contents(GROUPS_FILE);
-    $groups = json_decode($content ?: '[]', true);
-    $normalized = normalize_groups(is_array($groups) ? $groups : []);
+    $normalized = normalize_groups(lightfolio_read_groups());
 
     return count($normalized) > 0 ? $normalized : default_groups();
 }
@@ -110,6 +100,7 @@ function normalize_groups(array $value): array
             'name' => $name,
             'category' => $category,
             'description' => trim((string)($item['description'] ?? '')),
+            'coverPhotoId' => trim((string)($item['coverPhotoId'] ?? '')),
         ];
     }
 
@@ -128,26 +119,15 @@ function normalize_group_id(string $value): string
 function default_groups(): array
 {
     return [
-        ['id' => 'daily', 'name' => '日常记录', 'category' => 'life', 'description' => '随手捕捉的光线、街角与瞬间。'],
-        ['id' => 'travel', 'name' => '旅行片段', 'category' => 'portfolio', 'description' => '按旅程整理的一组照片。'],
+        ['id' => 'daily', 'name' => '日常记录', 'category' => 'life', 'description' => '随手捕捉的光线、街角与瞬间。', 'coverPhotoId' => ''],
+        ['id' => 'travel', 'name' => '旅行片段', 'category' => 'portfolio', 'description' => '按旅程整理的一组照片。', 'coverPhotoId' => ''],
     ];
 }
 
 function category_ids(): array
 {
-    if (!file_exists(CATEGORIES_FILE)) {
-        return ['portfolio', 'life'];
-    }
-
-    $content = file_get_contents(CATEGORIES_FILE);
-    $categories = json_decode($content ?: '[]', true);
-
-    if (!is_array($categories)) {
-        return ['portfolio', 'life'];
-    }
-
     $ids = [];
-    foreach ($categories as $category) {
+    foreach (lightfolio_read_categories() as $category) {
         if (is_array($category) && isset($category['id'])) {
             $id = trim((string)$category['id']);
             if ($id !== '') {

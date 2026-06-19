@@ -9,7 +9,7 @@ $csrfToken = csrf_token();
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Lightfolio | 管理后台</title>
-    <link rel="stylesheet" href="./styles.css?v=20260614-admin-preview" />
+    <link rel="stylesheet" href="./styles.css?v=20260614-viewer-meta-center" />
   </head>
   <body class="admin-page">
     <div id="admin-app" v-cloak>
@@ -19,10 +19,11 @@ $csrfToken = csrf_token();
           <span>Lightfolio</span>
         </a>
         <div class="admin-toolbar">
-          <button class="ghost-button" type="button" @click="exportPhotos">导出</button>
+          <button class="ghost-button" type="button" @click="downloadBackup('sqlite')">下载数据库</button>
+          <button class="ghost-button" type="button" @click="downloadBackup('json')">导出 JSON</button>
           <label class="ghost-button file-action">
-            导入
-            <input type="file" accept="application/json" @change="importPhotos" />
+            恢复
+            <input type="file" accept=".sqlite,.db,application/vnd.sqlite3,application/json" @change="restoreBackup" />
           </label>
           <a class="ghost-button" href="./logout.php">退出</a>
           <a class="solid-button" href="./index.html">查看画廊</a>
@@ -77,8 +78,43 @@ $csrfToken = csrf_token();
               </label>
 
               <label>
-                <span>拍摄信息</span>
-                <input v-model.trim="photoForm.meta" type="text" maxlength="80" placeholder="例如：上海 · 35mm" />
+                <span>补充说明</span>
+                <input v-model.trim="photoForm.meta" type="text" maxlength="120" placeholder="例如：上海外滩夜景" />
+              </label>
+
+              <label>
+                <span>拍摄时间</span>
+                <input v-model.trim="photoForm.shotAt" type="text" maxlength="32" placeholder="自动识别，例：2026-06-14 18:22:10" />
+              </label>
+
+              <label>
+                <span>机身</span>
+                <input v-model.trim="photoForm.camera" type="text" maxlength="80" placeholder="自动识别，例：SONY ILCE-7M4" />
+              </label>
+
+              <label>
+                <span>镜头</span>
+                <input v-model.trim="photoForm.lens" type="text" maxlength="80" placeholder="自动识别，例：FE 35mm F1.4 GM" />
+              </label>
+
+              <label>
+                <span>焦距</span>
+                <input v-model.trim="photoForm.focalLength" type="text" maxlength="24" placeholder="自动识别，例：35mm" />
+              </label>
+
+              <label>
+                <span>光圈</span>
+                <input v-model.trim="photoForm.aperture" type="text" maxlength="24" placeholder="自动识别，例：f/1.8" />
+              </label>
+
+              <label>
+                <span>快门</span>
+                <input v-model.trim="photoForm.shutter" type="text" maxlength="24" placeholder="自动识别，例：1/250s" />
+              </label>
+
+              <label>
+                <span>ISO</span>
+                <input v-model.trim="photoForm.iso" type="text" maxlength="24" placeholder="自动识别，例：ISO 400" />
               </label>
 
               <label>
@@ -88,7 +124,7 @@ $csrfToken = csrf_token();
 
               <label class="upload-dropzone">
                 <span>{{ uploadLabel }}</span>
-                <small>选择图片后会在浏览器端压缩为 WEBP 再上传</small>
+                <small>选择图片后会在浏览器端转为 WebP，并尽量自动识别拍摄参数</small>
                 <input type="file" accept="image/*" @change="uploadPhoto" />
               </label>
 
@@ -129,12 +165,14 @@ $csrfToken = csrf_token();
               </form>
 
               <div class="token-list">
-                <article v-for="category in categories" :key="category.id" class="token-item">
+                <article v-for="(category, index) in categories" :key="category.id" class="token-item">
                   <div>
                     <strong>{{ category.name }}</strong>
                     <small>{{ category.id }} · {{ groups.filter((group) => group.category === category.id).length }} 组</small>
                   </div>
                   <div class="row-actions">
+                    <button type="button" @click="moveCategory(index, -1)" :disabled="index === 0">上移</button>
+                    <button type="button" @click="moveCategory(index, 1)" :disabled="index === categories.length - 1">下移</button>
                     <button type="button" @click="editCategory(category.id)">编辑</button>
                     <button class="is-danger" type="button" @click="deleteCategory(category.id)">删除</button>
                   </div>
@@ -169,6 +207,15 @@ $csrfToken = csrf_token();
                   <span>分组说明</span>
                   <input v-model.trim="groupForm.description" type="text" maxlength="80" placeholder="用于前台分组卡片" />
                 </label>
+                <label>
+                  <span>封面照片</span>
+                  <select v-model="groupForm.coverPhotoId">
+                    <option value="">自动使用第一张</option>
+                    <option v-for="photo in photosForGroup(groupForm.originalId || groupForm.id)" :key="photo.id" :value="photo.id">
+                      {{ photo.title }}
+                    </option>
+                  </select>
+                </label>
                 <div class="form-actions">
                   <button class="solid-button" type="submit">保存分组</button>
                   <button class="ghost-button" type="button" @click="resetGroupForm">新建</button>
@@ -176,12 +223,15 @@ $csrfToken = csrf_token();
               </form>
 
               <div class="token-list">
-                <article v-for="group in groups" :key="group.id" class="token-item">
+                <article v-for="(group, index) in groups" :key="group.id" class="token-item">
                   <div>
                     <strong>{{ group.name }}</strong>
                     <small>{{ categoryLabel(group.category) }} · {{ photos.filter((photo) => photo.group === group.id).length }} 张<span v-if="group.description"> · {{ group.description }}</span></small>
+                    <small v-if="groupCoverPhoto(group.id)">封面 · {{ groupCoverPhoto(group.id).title }}</small>
                   </div>
                   <div class="row-actions">
+                    <button type="button" @click="moveGroup(index, -1)" :disabled="index === 0">上移</button>
+                    <button type="button" @click="moveGroup(index, 1)" :disabled="index === groups.length - 1">下移</button>
                     <button type="button" @click="editGroup(group.id)">编辑</button>
                     <button class="is-danger" type="button" @click="deleteGroup(group.id)">删除</button>
                   </div>
@@ -200,13 +250,18 @@ $csrfToken = csrf_token();
             </div>
 
             <div class="library-grid">
-              <article v-for="photo in photos" :key="photo.id" class="library-item">
+              <article v-for="(photo, index) in photos" :key="photo.id" class="library-item">
                 <img :src="previewSrc(photo)" :alt="photo.title" loading="lazy" />
                 <div>
                   <h3>{{ photo.title }}</h3>
-                  <p>{{ groupLabel(photo.group) }} / {{ categoryLabel(groupMap[photo.group]?.category) }}<span v-if="photo.meta"> · {{ photo.meta }}</span></p>
+                  <p>{{ groupLabel(photo.group) }} / {{ categoryLabel(groupMap[photo.group]?.category) }}<span v-if="photoInfo(photo).summary"> · {{ photoInfo(photo).summary }}</span></p>
                 </div>
                 <div class="row-actions">
+                  <button type="button" @click="movePhoto(index, -1)" :disabled="index === 0">上移</button>
+                  <button type="button" @click="movePhoto(index, 1)" :disabled="index === photos.length - 1">下移</button>
+                  <button type="button" @click="setGroupCover(photo)" :disabled="isGroupCover(photo)">
+                    {{ isGroupCover(photo) ? "当前封面" : "设为封面" }}
+                  </button>
                   <button type="button" @click="editPhoto(photo.id)">编辑</button>
                   <button class="is-danger" type="button" @click="deletePhoto(photo.id)">删除</button>
                 </div>
@@ -223,7 +278,8 @@ $csrfToken = csrf_token();
       };
     </script>
     <script src="./vendor/vue.global.prod.js"></script>
-    <script src="./gallery-data.js?v=20260614-preview-fix"></script>
-    <script src="./admin.js?v=20260614-preview-fix"></script>
+    <script src="./vendor/exifr.lite.umd.js"></script>
+    <script src="./gallery-data.js?v=20260614-photo-meta"></script>
+    <script src="./admin.js?v=20260614-exif-reliable"></script>
   </body>
 </html>

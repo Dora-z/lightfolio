@@ -2,13 +2,16 @@
 declare(strict_types=1);
 
 require __DIR__ . '/../lib/auth.php';
-
-const CATEGORIES_FILE = __DIR__ . '/../data/categories.json';
+require __DIR__ . '/../lib/sqlite_store.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    echo json_encode(read_categories(), JSON_UNESCAPED_UNICODE);
+    try {
+        echo json_encode(read_categories(), JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $error) {
+        lightfolio_json_error($error);
+    }
     exit;
 }
 
@@ -47,28 +50,17 @@ if (count($categories) === 0) {
     exit;
 }
 
-$directory = dirname(CATEGORIES_FILE);
-if (!is_dir($directory)) {
-    mkdir($directory, 0755, true);
+try {
+    lightfolio_save_categories($categories);
+} catch (Throwable $error) {
+    lightfolio_json_error($error);
 }
-
-file_put_contents(
-    CATEGORIES_FILE,
-    json_encode($categories, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
-    LOCK_EX
-);
 
 echo json_encode($categories, JSON_UNESCAPED_UNICODE);
 
 function read_categories(): array
 {
-    if (!file_exists(CATEGORIES_FILE)) {
-        return default_categories();
-    }
-
-    $content = file_get_contents(CATEGORIES_FILE);
-    $categories = json_decode($content ?: '[]', true);
-    $normalized = normalize_categories(is_array($categories) ? $categories : []);
+    $normalized = normalize_categories(lightfolio_read_categories());
 
     return count($normalized) > 0 ? $normalized : default_categories();
 }

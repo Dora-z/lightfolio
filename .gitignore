@@ -2,6 +2,9 @@
 __pycache__/
 *.log
 upload-test.png
+data/*.sqlite
+data/*.sqlite-*
+data/*.restore-backup-*
 uploads/*
 !uploads/.gitignore
 uploads/previews/*

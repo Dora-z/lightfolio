@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Lightfolio 摄影画廊" />
     <title>Lightfolio | 画廊</title>
-    <link rel="stylesheet" href="./styles.css?v=20260614-same-height" />
+    <link rel="stylesheet" href="./styles.css?v=20260619-topbar-filters" />
   </head>
   <body class="gallery-page">
     <div id="gallery-app" v-cloak>
@@ -14,6 +14,29 @@
           <span class="brand-mark"></span>
           <span>Lightfolio</span>
         </a>
+        <div class="gallery-toolbar" aria-label="gallery filters">
+          <div class="gallery-current" aria-live="polite">
+            <strong>{{ activeGalleryTitle }}</strong>
+            <small>{{ galleryStats.groups }} 组 · {{ galleryStats.photos }} 张</small>
+          </div>
+          <nav class="category-strip" aria-label="categories">
+            <button class="category-pill" :class="{ 'is-active': activeCategory === 'all' }" type="button" @click="setCategory('all')">
+              <span>全部</span>
+              <small>{{ totalPhotoCount }}</small>
+            </button>
+            <button
+              v-for="category in categories"
+              :key="category.id"
+              class="category-pill"
+              :class="{ 'is-active': activeCategory === category.id }"
+              type="button"
+              @click="setCategory(category.id)"
+            >
+              <span>{{ category.name }}</span>
+              <small>{{ categoryPhotoCount(category.id) }}</small>
+            </button>
+          </nav>
+        </div>
         <nav class="gallery-actions" aria-label="画廊操作">
           <button class="icon-button" type="button" @click="compact = !compact" aria-label="切换密度" title="切换密度">
             <span class="icon-grid"></span>
@@ -23,22 +46,6 @@
       </header>
 
       <main class="gallery-view" :class="{ 'is-compact': compact }" aria-label="摄影作品画廊">
-        <aside class="category-strip" aria-label="分类">
-          <button class="category-pill" :class="{ 'is-active': activeCategory === 'all' }" type="button" @click="setCategory('all')">
-            全部
-          </button>
-          <button
-            v-for="category in categories"
-            :key="category.id"
-            class="category-pill"
-            :class="{ 'is-active': activeCategory === category.id }"
-            type="button"
-            @click="setCategory(category.id)"
-          >
-            {{ category.name }}
-          </button>
-        </aside>
-
         <section id="gallery" class="gallery-board" :class="{ 'is-switching': switching }" aria-live="polite">
           <div v-if="!visibleGroups.length" class="empty-state">
             <span>暂无作品</span>
@@ -46,7 +53,7 @@
 
           <section v-for="category in visibleCategories" :key="category.id" class="category-section">
             <header class="section-heading">
-              <h1>{{ category.name }}</h1>
+              <h2>{{ category.name }}</h2>
               <span>{{ groupsForCategory(category.id).length }} 组</span>
             </header>
 
@@ -60,7 +67,7 @@
               >
                 <span class="photo-stack" :class="stackClass(group.id)">
                   <span
-                    v-for="(photo, index) in photosForGroup(group.id).slice(0, 3)"
+                    v-for="(photo, index) in coverPhotosForGroup(group).slice(0, 3)"
                     :key="photo.id"
                     class="photo-tile"
                     :class="`photo-tile-${index + 1}`"
@@ -104,7 +111,11 @@
           </div>
           <figcaption>
             <strong id="viewer-title">{{ currentPhoto?.title }}</strong>
-            <span>{{ viewerMeta }}</span>
+            <div class="viewer-meta-center" v-if="viewerPhotoDetails || viewerExtraMeta">
+              <span v-if="viewerPhotoDetails">{{ viewerPhotoDetails }}</span>
+              <span v-if="viewerExtraMeta">{{ viewerExtraMeta }}</span>
+            </div>
+            <span class="viewer-position">{{ viewerGroupPosition }}</span>
           </figcaption>
         </figure>
         <button class="viewer-arrow viewer-next" type="button" aria-label="下一张" @click="moveViewer(1)">›</button>
@@ -124,7 +135,7 @@
     </div>
 
     <script src="./vendor/vue.global.prod.js"></script>
-    <script src="./gallery-data.js?v=20260614-preview-fix"></script>
-    <script src="./script.js?v=20260614-preview-fix"></script>
+    <script src="./gallery-data.js?v=20260614-photo-meta"></script>
+    <script src="./script.js?v=20260619-gallery-polish"></script>
   </body>
 </html>
